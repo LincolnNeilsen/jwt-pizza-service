@@ -121,9 +121,26 @@
         expect(addRes.body.some(item => item.title === 'Admin Pizza')).toBe(true);
 
     });
+    test('getFranchises', async () => {
+        const adminUser = await createAdminUser();
+        const getFranchisesRes = await request(app)
+            .get('/api/franchise?page=0&limit=10&name=*')
+            .set('Authorization', `Bearer ${adminUser.token}`);
+        expect(getFranchisesRes.status).toBe(200);
+        expect(getFranchisesRes.body.franchises).toBeDefined();
+    });
+    test('createFranchise', async () => {
+    });
+    test('createStore', async () => {
+
+    });
+    test('deleteStore', async () => {
+
+    });
+
     test('deleteFranchise', async () => {
         const adminUser = await createAdminUser();
-        // Test deleteFranchise (just to cover it)
+        // Test deleteFranchise
         const delRes = await request(app)
             .delete('/api/franchise/1')
             .set('Authorization', `Bearer ${adminUser.token}`);
