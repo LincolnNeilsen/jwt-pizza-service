@@ -8,24 +8,7 @@
     }
 
     async function createAdminUser() {
-        const user = { 
-            name: randomName(), 
-            email: randomName() + '@admin.com', 
-            password: 'toomanysecrets', 
-            roles: [{ role: Role.Admin }] 
-        };
-
-        await DB.addUser(user);
-
-        // Login to get token (this matches real behavior)
-        const loginRes = await request(app)
-            .put('/api/auth')
-            .send({ email: user.email, password: user.password });
-
-        return {
-            ...user,
-            token: loginRes.body.token
-        };
+        return createUserAndLogin([{ role: Role.Admin }]);
     }
 
     async function createUserAndLogin(roles = [{ role: Role.Diner }]) {
@@ -63,6 +46,24 @@
             .set('Authorization', `Bearer ${adminUser.token}`)
             .send({ name: storeName });
         return res.body;
+    }
+
+    async function createOrder(userToken, franchiseId, storeId, item) {
+        return request(app)
+            .post('/api/order')
+            .set('Authorization', `Bearer ${userToken}`)
+            .send({
+                franchiseId: franchiseId,
+                storeId: storeId,
+                items: [{ menuId: item.id, description: item.description, price: item.price }]
+            });
+    }
+
+    async function addMenuItem(adminUser, item) {
+        return request(app)
+            .put('/api/order/menu')
+            .set('Authorization', `Bearer ${adminUser.token}`)
+            .send(item);
     }
 
 
@@ -129,32 +130,25 @@
     test('createOrder and getOrders', async () => {
         const user = await createUserAndLogin();
         const adminUser = await createAdminUser();
+
+        // Ensure there is at least one item in the menu
+        const newItem = { title: 'Test Pizza', description: 'For testing', image: 'pizza.png', price: 0.05 };
+        await addMenuItem(adminUser, newItem);
+
         // Create a franchise and store first to avoid hardcoded IDs
         const franchise = await createFranchise(adminUser);
-        const franchiseId = franchise.id;
-
-        const store = await createStore(adminUser, franchiseId);
-        const storeId = store.id;
+        const store = await createStore(adminUser, franchise.id);
 
         // First, get the menu to find an item
         const menuRes = await request(app).get('/api/order/menu');
-        const menuId = menuRes.body[0].id;
-        const menuDescription = menuRes.body[0].description;
-        const menuPrice = menuRes.body[0].price;
+        const item = menuRes.body[0];
 
         // Create an order
-        const orderRes = await request(app)
-            .post('/api/order')
-            .set('Authorization', `Bearer ${user.token}`)
-            .send({
-                franchiseId: franchiseId,
-                storeId: storeId,
-                items: [{ menuId: menuId, description: menuDescription, price: menuPrice }]
-            });
+        const orderRes = await createOrder(user.token, franchise.id, store.id, item);
 
         expect(orderRes.status).toBe(200);
         expect(orderRes.body.order).toBeDefined();
-        expect(orderRes.body.order.items[0].description).toBe(menuDescription);
+        expect(orderRes.body.order.items[0].description).toBe(item.description);
         expect(orderRes.body.jwt).toBe('mock-factory-jwt');
         expect(global.fetch).toHaveBeenCalled();
 
@@ -173,6 +167,11 @@
     test('createOrder (factory failure)', async () => {
         const user = await createUserAndLogin();
         const adminUser = await createAdminUser();
+
+        // Ensure there is at least one item in the menu
+        const newItem = { title: 'Test Pizza', description: 'For testing', image: 'pizza.png', price: 0.05 };
+        await addMenuItem(adminUser, newItem);
+
         const franchise = await createFranchise(adminUser);
         const store = await createStore(adminUser, franchise.id);
 
@@ -187,14 +186,7 @@
             }),
         });
 
-        const orderRes = await request(app)
-            .post('/api/order')
-            .set('Authorization', `Bearer ${user.token}`)
-            .send({
-                franchiseId: franchise.id,
-                storeId: store.id,
-                items: [{ menuId: item.id, description: item.description, price: item.price }]
-            });
+        const orderRes = await createOrder(user.token, franchise.id, store.id, item);
 
         expect(orderRes.status).toBe(500);
         expect(orderRes.body.message).toBe('Failed to fulfill order at factory');
@@ -205,10 +197,7 @@
 
         // Test addMenuItem
         const newItem = { title: 'Admin Pizza', description: 'For admins', image: 'pizza2.png', price: 0.05 };
-        const addRes = await request(app)
-            .put('/api/order/menu')
-            .set('Authorization', `Bearer ${adminUser.token}`)
-            .send(newItem);
+        const addRes = await addMenuItem(adminUser, newItem);
         expect(addRes.status).toBe(200);
         expect(addRes.body.some(item => item.title === 'Admin Pizza')).toBe(true);
 
