@@ -66,6 +66,16 @@
     }
 
 
+    beforeEach(() => {
+        global.fetch = jest.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                reportUrl: 'http://factory-report.com',
+                jwt: 'mock-factory-jwt'
+            }),
+        });
+    });
+
     test('login', async () => {
         const userName = randomName();
         const userEmail = randomName() + '@test.com';
@@ -132,15 +142,6 @@
         const menuDescription = menuRes.body[0].description;
         const menuPrice = menuRes.body[0].price;
 
-        // Mock the factory API call
-        global.fetch = jest.fn().mockResolvedValue({
-            ok: true,
-            json: async () => ({
-                reportUrl: 'http://factory-report.com',
-                jwt: 'mock-factory-jwt'
-            }),
-        });
-
         // Create an order
         const orderRes = await request(app)
             .post('/api/order')
@@ -155,6 +156,7 @@
         expect(orderRes.body.order).toBeDefined();
         expect(orderRes.body.order.items[0].description).toBe(menuDescription);
         expect(orderRes.body.jwt).toBe('mock-factory-jwt');
+        expect(global.fetch).toHaveBeenCalled();
 
         // Get orders
         const getOrdersRes = await request(app)
@@ -166,6 +168,36 @@
         
         const createdOrder = getOrdersRes.body.orders.find(o => o.id === orderRes.body.order.id);
         expect(createdOrder).toBeDefined();
+    });
+
+    test('createOrder (factory failure)', async () => {
+        const user = await createUserAndLogin();
+        const adminUser = await createAdminUser();
+        const franchise = await createFranchise(adminUser);
+        const store = await createStore(adminUser, franchise.id);
+
+        const menuRes = await request(app).get('/api/order/menu');
+        const item = menuRes.body[0];
+
+        global.fetch = jest.fn().mockResolvedValue({
+            ok: false,
+            json: async () => ({
+                reportUrl: 'http://factory-report.com/fail',
+                message: 'Factory error'
+            }),
+        });
+
+        const orderRes = await request(app)
+            .post('/api/order')
+            .set('Authorization', `Bearer ${user.token}`)
+            .send({
+                franchiseId: franchise.id,
+                storeId: store.id,
+                items: [{ menuId: item.id, description: item.description, price: item.price }]
+            });
+
+        expect(orderRes.status).toBe(500);
+        expect(orderRes.body.message).toBe('Failed to fulfill order at factory');
     });
 
     test('addMenuItem', async () => {
@@ -240,6 +272,24 @@
             .set('Authorization', `Bearer ${user.token}`);
         expect(logoutRes.status).toBe(200);
         expect(logoutRes.body.message).toBe('logout successful');
+    });
+
+    test('register (invalid body)', async () => {
+        const res = await request(app)
+            .post('/api/auth')
+            .send({ name: 'missing email and password' });
+        expect(res.status).toBe(400);
+    });
+
+    test('createOrder (invalid body)', async () => {
+        const user = await createUserAndLogin();
+        const res = await request(app)
+            .post('/api/order')
+            .set('Authorization', `Bearer ${user.token}`)
+            .send({ franchiseId: 1 }); // Missing items and storeId
+        // The app might fail with 500 or 400 depending on implementation
+        // Let's see what happens.
+        expect([400, 500]).toContain(res.status);
     });
 
     test('getMe', async () => {
