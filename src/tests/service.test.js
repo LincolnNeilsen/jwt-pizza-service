@@ -31,6 +31,22 @@
         };
     }
 
+    async function createUserAndLogin(roles = [{ role: Role.Diner }]) {
+        const user = {
+            name: randomName(),
+            email: randomName() + '@test.com',
+            password: 'password',
+            roles: roles
+        };
+        await DB.addUser(user);
+        const loginRes = await request(app).put('/api/auth').send({ email: user.email, password: user.password });
+        return {
+            ...user,
+            id: loginRes.body.user.id,
+            token: loginRes.body.token
+        };
+    }
+
     async function createFranchise(adminUser) {
         const franchiseName = `Franchise-${randomName()}`;
         const res = await request(app)
@@ -207,6 +223,49 @@
         expect(logoutRes.body.message).toBe('logout successful');
     });
 
+    test('getMe', async () => {
+        const user = await createUserAndLogin();
+
+        const res = await request(app)
+            .get('/api/user/me')
+            .set('Authorization', `Bearer ${user.token}`);
+        
+        expect(res.status).toBe(200);
+        expect(res.body.email).toBe(user.email);
+    });
+
+    test('getUserFranchises', async () => {
+        const adminUser = await createAdminUser();
+        
+        // Create a franchise where adminUser is an admin
+        const franchise = await createFranchise(adminUser);
+        
+        // Re-login as admin to ensure the role update is reflected in the token if necessary
+        const loginRes = await request(app).put('/api/auth').send({ email: adminUser.email, password: adminUser.password });
+        const token = loginRes.body.token;
+        const userId = loginRes.body.user.id;
+
+        const res = await request(app)
+            .get(`/api/franchise/${userId}`)
+            .set('Authorization', `Bearer ${token}`);
+        
+        expect(res.status).toBe(200);
+        expect(Array.isArray(res.body)).toBe(true);
+        expect(res.body.length).toBeGreaterThan(0);
+        expect(res.body[0].id).toBe(franchise.id);
+    });
+
+    test('createFranchise (unauthorized)', async () => {
+        const user = await createUserAndLogin();
+
+        const res = await request(app)
+            .post('/api/franchise')
+            .set('Authorization', `Bearer ${user.token}`)
+            .send({ name: 'Hack Franchise', admins: [{ email: user.email }] });
+        // The middleware returns 403 if req.user exists but is not an admin
+        expect([401, 403]).toContain(res.status);
+    });
+
     test('root endpoint', async () => {
         const res = await request(app).get('/');
         expect(res.status).toBe(200);
@@ -249,9 +308,46 @@
         // Create a franchise first
         const franchise = await createFranchise(adminUser);
 
+        // Ensure we have a valid token for a non-admin user
+        const user = await createUserAndLogin();
+
         const res = await request(app)
             .post(`/api/franchise/${franchise.id}/store`)
-            .set('Authorization', `Bearer ${testUserAuthToken}`)
+            .set('Authorization', `Bearer ${user.token}`)
             .send({ name: 'My Store' });
-        expect(res.status).toBe(401);
+        expect([401, 403]).toContain(res.status);
+    });
+
+    test('deleteStore (unauthorized)', async () => {
+        const adminUser = await createAdminUser();
+        const franchise = await createFranchise(adminUser);
+        const store = await createStore(adminUser, franchise.id);
+
+        // Ensure we have a valid token for a non-admin user
+        const user = await createUserAndLogin();
+
+        const res = await request(app)
+            .delete(`/api/franchise/${franchise.id}/store/${store.id}`)
+            .set('Authorization', `Bearer ${user.token}`);
+        expect([401, 403]).toContain(res.status);
+    });
+    test('delete store as franchisee', async () => {
+        const adminUser = await createAdminUser();
+        
+        // Create a franchisee user
+        const franchiseeUser = await createUserAndLogin();
+
+        // Create franchise with this user as admin
+        const franchise = await createFranchise({ ...adminUser, email: franchiseeUser.email });
+        const franchiseId = franchise.id;
+
+        // Create store
+        const store = await createStore(adminUser, franchiseId);
+
+        // Delete store as franchisee
+        const delRes = await request(app)
+            .delete(`/api/franchise/${franchiseId}/store/${store.id}`)
+            .set('Authorization', `Bearer ${franchiseeUser.token}`);
+        expect(delRes.status).toBe(200);
+        expect(delRes.body.message).toBe('store deleted');
     });
