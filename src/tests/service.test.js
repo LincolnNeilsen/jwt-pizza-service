@@ -130,13 +130,48 @@
         expect(getFranchisesRes.body.franchises).toBeDefined();
     });
     test('createFranchise', async () => {
-    });
-    test('createStore', async () => {
+        const adminUser = await createAdminUser();
 
-    });
-    test('deleteStore', async () => {
+        const createRes = await request(app)
+            .post('/api/franchise')
+            .set('Authorization', `Bearer ${adminUser.token}`)
+            .send({
+                name: `Franchise-${randomName()}`,
+                admins: [
+                    { email: adminUser.email }
+                ]
+            });
 
+        expect(createRes.status).toBe(200);
+        expect(createRes.body.name).toBeDefined();
+        expect(createRes.body.admins).toBeDefined();
+        expect(createRes.body.admins[0].email).toBe(adminUser.email);
     });
+    test('store test', async () => {
+        const adminUser = await createAdminUser();
+
+        // Step 1: create a franchise
+        const franchiseRes = await request(app)
+            .post('/api/franchise')
+            .set('Authorization', `Bearer ${adminUser.token}`)
+            .send({
+                name: `Franchise-${randomName()}`,
+                admins: [{ email: adminUser.email }]
+            });
+        expect(franchiseRes.status).toBe(200);
+
+        const franchiseId = franchiseRes.body.id;
+
+        // Step 2: create store for that franchise
+        const storeName = `Store-${randomName()}`;
+        const createRes = await request(app)
+            .post(`/api/franchise/${franchiseId}/store`)
+            .set('Authorization', `Bearer ${adminUser.token}`)
+            .send({ name: storeName });
+
+        expect(createRes.status).toBe(200);
+        expect(createRes.body.name).toBe(storeName);
+    })
 
     test('deleteFranchise', async () => {
         const adminUser = await createAdminUser();
