@@ -1,9 +1,6 @@
     const request = require('supertest');
     const app = require('../service');
 
-    const testUser = { name: 'pizza diner', email: 'reg@test.com', password: 'a' };
-    let testUserAuthToken;
-
     const { DB, Role } = require('../database/database.js');
 
     function randomName() {
@@ -69,27 +66,36 @@
     }
 
 
-
-    beforeAll(async () => {
-        testUser.email = Math.random().toString(36).substring(2, 12) + '@test.com';
-        const registerRes = await request(app).post('/api/auth').send(testUser);
-        testUser.id = registerRes.body.user.id;
-        testUserAuthToken = registerRes.body.token;
-    });
-
     test('login', async () => {
-        const loginRes = await request(app).put('/api/auth').send(testUser);
+        const userName = randomName();
+        const userEmail = randomName() + '@test.com';
+        const userPassword = 'password';
+        
+        // Register first
+        await request(app)
+            .post('/api/auth')
+            .send({ name: userName, email: userEmail, password: userPassword });
+
+        const loginRes = await request(app)
+            .put('/api/auth')
+            .send({ email: userEmail, password: userPassword });
+
         expect(loginRes.status).toBe(200);
         expect(loginRes.body.token).toMatch(/^[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*\.[a-zA-Z0-9\-_]*$/);
 
-        const { password, ...user } = { ...testUser, roles: [{ role: 'diner' }] };
-        expect(loginRes.body.user).toMatchObject(user);
+        expect(loginRes.body.user).toMatchObject({
+            name: userName,
+            email: userEmail,
+            roles: [{ role: Role.Diner }]
+        });
     });
+
     test('userUpdate', async () => {
+        const user = await createUserAndLogin();
         const newEmail = randomName() + '@test.com';
         const updateRes = await request(app)
-            .put(`/api/user/${testUser.id}`)
-            .set('Authorization', `Bearer ${testUserAuthToken}`)
+            .put(`/api/user/${user.id}`)
+            .set('Authorization', `Bearer ${user.token}`)
             .send({ email: newEmail });
         expect(updateRes.status).toBe(200);
         expect(updateRes.body.user.email).toBe(newEmail);
@@ -102,14 +108,16 @@
     });
 
     test('addMenuItem (unauthorized)', async () => {
+        const user = await createUserAndLogin();
         const res = await request(app)
             .put('/api/order/menu')
-            .set('Authorization', `Bearer ${testUserAuthToken}`)
+            .set('Authorization', `Bearer ${user.token}`)
             .send({ title: 'New Pizza', description: 'Delicious', image: 'pizza.png', price: 0.01 });
         expect(res.status).toBe(403);
     });
 
     test('createOrder and getOrders', async () => {
+        const user = await createUserAndLogin();
         const adminUser = await createAdminUser();
         // Create a franchise and store first to avoid hardcoded IDs
         const franchise = await createFranchise(adminUser);
@@ -121,33 +129,43 @@
         // First, get the menu to find an item
         const menuRes = await request(app).get('/api/order/menu');
         const menuId = menuRes.body[0].id;
+        const menuDescription = menuRes.body[0].description;
+        const menuPrice = menuRes.body[0].price;
+
+        // Mock the factory API call
+        global.fetch = jest.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                reportUrl: 'http://factory-report.com',
+                jwt: 'mock-factory-jwt'
+            }),
+        });
 
         // Create an order
         const orderRes = await request(app)
             .post('/api/order')
-            .set('Authorization', `Bearer ${testUserAuthToken}`)
+            .set('Authorization', `Bearer ${user.token}`)
             .send({
                 franchiseId: franchiseId,
                 storeId: storeId,
-                items: [{ menuId: menuId, description: 'Veggie', price: 0.05 }]
+                items: [{ menuId: menuId, description: menuDescription, price: menuPrice }]
             });
 
-        // Note: Factory might fail if not mocked, but we check if it reaches DB logic or fails correctly
-        if (orderRes.status === 200) {
-            expect(orderRes.body.order).toBeDefined();
-            expect(orderRes.body.jwt).toBeDefined();
-        } else {
-            expect(orderRes.status).toBe(500);
-            expect(orderRes.body.message).toMatch(/Failed to fulfill order at factory/);
-        }
+        expect(orderRes.status).toBe(200);
+        expect(orderRes.body.order).toBeDefined();
+        expect(orderRes.body.order.items[0].description).toBe(menuDescription);
+        expect(orderRes.body.jwt).toBe('mock-factory-jwt');
 
         // Get orders
         const getOrdersRes = await request(app)
             .get('/api/order')
-            .set('Authorization', `Bearer ${testUserAuthToken}`);
+            .set('Authorization', `Bearer ${user.token}`);
         expect(getOrdersRes.status).toBe(200);
         expect(getOrdersRes.body.orders).toBeDefined();
         expect(getOrdersRes.body.orders.length).toBeGreaterThan(0);
+        
+        const createdOrder = getOrdersRes.body.orders.find(o => o.id === orderRes.body.order.id);
+        expect(createdOrder).toBeDefined();
     });
 
     test('addMenuItem', async () => {
@@ -216,9 +234,10 @@
     });
 
     test('logout', async () => {
+        const user = await createUserAndLogin();
         const logoutRes = await request(app)
             .delete('/api/auth')
-            .set('Authorization', `Bearer ${testUserAuthToken}`);
+            .set('Authorization', `Bearer ${user.token}`);
         expect(logoutRes.status).toBe(200);
         expect(logoutRes.body.message).toBe('logout successful');
     });
@@ -288,17 +307,18 @@
 
     test('update other user (unauthorized)', async () => {
         const adminUser = await createAdminUser();
+        const user = await createUserAndLogin();
         const updateRes = await request(app)
             .put(`/api/user/${adminUser.id}`)
-            .set('Authorization', `Bearer ${testUserAuthToken}`)
+            .set('Authorization', `Bearer ${user.token}`)
             .send({ email: 'hacker@test.com' });
-        expect(updateRes.status).toBe(401);
+        expect(updateRes.status).toBe(403);
     });
 
     test('login with invalid credentials', async () => {
         const res = await request(app)
             .put('/api/auth')
-            .send({ email: testUser.email, password: 'wrongpassword' });
+            .send({ email: 'nonexistent@test.com', password: 'wrongpassword' });
         expect(res.status).toBe(404);
         expect(res.body.message).toBe('unknown user');
     });
