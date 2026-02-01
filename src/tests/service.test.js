@@ -11,14 +11,13 @@
     }
 
     async function createAdminUser() {
-        let user = { password: 'toomanysecrets', roles: [{ role: Role.Admin }] };
-        user.name = randomName();
-        user.email = user.name + '@admin.com';
+        const user = { 
+            name: randomName(), 
+            email: randomName() + '@admin.com', 
+            password: 'toomanysecrets', 
+            roles: [{ role: Role.Admin }] 
+        };
 
-        await DB.addUser(user);
-        user.password = 'toomanysecrets';
-
-        // Register admin
         await DB.addUser(user);
 
         // Login to get token (this matches real behavior)
@@ -74,6 +73,23 @@
     });
 
     test('createOrder and getOrders', async () => {
+        const adminUser = await createAdminUser();
+        // Create a franchise and store first to avoid hardcoded IDs
+        const franchiseRes = await request(app)
+            .post('/api/franchise')
+            .set('Authorization', `Bearer ${adminUser.token}`)
+            .send({
+                name: `Franchise-${randomName()}`,
+                admins: [{ email: adminUser.email }]
+            });
+        const franchiseId = franchiseRes.body.id;
+
+        const storeRes = await request(app)
+            .post(`/api/franchise/${franchiseId}/store`)
+            .set('Authorization', `Bearer ${adminUser.token}`)
+            .send({ name: `Store-${randomName()}` });
+        const storeId = storeRes.body.id;
+
         // First, get the menu to find an item
         const menuRes = await request(app).get('/api/order/menu');
         const menuId = menuRes.body[0].id;
@@ -83,15 +99,12 @@
             .post('/api/order')
             .set('Authorization', `Bearer ${testUserAuthToken}`)
             .send({
-                franchiseId: 1,
-                storeId: 1,
+                franchiseId: franchiseId,
+                storeId: storeId,
                 items: [{ menuId: menuId, description: 'Veggie', price: 0.05 }]
             });
 
         // Note: Factory might fail if not mocked, but we check if it reaches DB logic or fails correctly
-        // Depending on whether factory is up or mocked, this might be 200 or 500
-        // The requirement is to write tests, if they fail due to external deps we might need to mock.
-
         if (orderRes.status === 200) {
             expect(orderRes.body.order).toBeDefined();
             expect(orderRes.body.jwt).toBeDefined();
@@ -106,6 +119,7 @@
             .set('Authorization', `Bearer ${testUserAuthToken}`);
         expect(getOrdersRes.status).toBe(200);
         expect(getOrdersRes.body.orders).toBeDefined();
+        expect(getOrdersRes.body.orders.length).toBeGreaterThan(0);
     });
 
     test('addMenuItem', async () => {
@@ -182,9 +196,20 @@
 
     test('deleteFranchise', async () => {
         const adminUser = await createAdminUser();
+        
+        // Create a franchise to delete
+        const createRes = await request(app)
+            .post('/api/franchise')
+            .set('Authorization', `Bearer ${adminUser.token}`)
+            .send({
+                name: `Franchise-${randomName()}`,
+                admins: [{ email: adminUser.email }]
+            });
+        const franchiseId = createRes.body.id;
+
         // Test deleteFranchise
         const delRes = await request(app)
-            .delete('/api/franchise/1')
+            .delete(`/api/franchise/${franchiseId}`)
             .set('Authorization', `Bearer ${adminUser.token}`);
         expect(delRes.status).toBe(200);
         expect(delRes.body.message).toBe('franchise deleted');
@@ -196,4 +221,60 @@
             .set('Authorization', `Bearer ${testUserAuthToken}`);
         expect(logoutRes.status).toBe(200);
         expect(logoutRes.body.message).toBe('logout successful');
+    });
+
+    test('root endpoint', async () => {
+        const res = await request(app).get('/');
+        expect(res.status).toBe(200);
+        expect(res.body.message).toBe('welcome to JWT Pizza');
+        expect(res.body.version).toBeDefined();
+    });
+
+    test('docs endpoint', async () => {
+        const res = await request(app).get('/api/docs');
+        expect(res.status).toBe(200);
+        expect(res.body.version).toBeDefined();
+        expect(res.body.endpoints).toBeDefined();
+    });
+
+    test('unknown endpoint', async () => {
+        const res = await request(app).get('/api/unknown');
+        expect(res.status).toBe(404);
+        expect(res.body.message).toBe('unknown endpoint');
+    });
+
+    test('update other user (unauthorized)', async () => {
+        const adminUser = await createAdminUser();
+        const updateRes = await request(app)
+            .put(`/api/user/${adminUser.id}`)
+            .set('Authorization', `Bearer ${testUserAuthToken}`)
+            .send({ email: 'hacker@test.com' });
+        expect(updateRes.status).toBe(401);
+    });
+
+    test('login with invalid credentials', async () => {
+        const res = await request(app)
+            .put('/api/auth')
+            .send({ email: testUser.email, password: 'wrongpassword' });
+        expect(res.status).toBe(404);
+        expect(res.body.message).toBe('unknown user');
+    });
+
+    test('create store as non-admin (unauthorized)', async () => {
+        const adminUser = await createAdminUser();
+        // Create a franchise first
+        const franchiseRes = await request(app)
+            .post('/api/franchise')
+            .set('Authorization', `Bearer ${adminUser.token}`)
+            .send({
+                name: `Franchise-${randomName()}`,
+                admins: [{ email: adminUser.email }]
+            });
+        const franchiseId = franchiseRes.body.id;
+
+        const res = await request(app)
+            .post(`/api/franchise/${franchiseId}/store`)
+            .set('Authorization', `Bearer ${testUserAuthToken}`)
+            .send({ name: 'My Store' });
+        expect(res.status).toBe(401);
     });
