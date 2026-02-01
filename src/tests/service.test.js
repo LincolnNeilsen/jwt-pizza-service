@@ -147,10 +147,10 @@
         expect(createRes.body.admins).toBeDefined();
         expect(createRes.body.admins[0].email).toBe(adminUser.email);
     });
-    test('store test', async () => {
+    test('franchiseStore', async () => {
         const adminUser = await createAdminUser();
 
-        // Step 1: create a franchise
+        //Create a franchise
         const franchiseRes = await request(app)
             .post('/api/franchise')
             .set('Authorization', `Bearer ${adminUser.token}`)
@@ -162,7 +162,7 @@
 
         const franchiseId = franchiseRes.body.id;
 
-        // Step 2: create store for that franchise
+        //Create store for that franchise
         const storeName = `Store-${randomName()}`;
         const createRes = await request(app)
             .post(`/api/franchise/${franchiseId}/store`)
@@ -171,7 +171,14 @@
 
         expect(createRes.status).toBe(200);
         expect(createRes.body.name).toBe(storeName);
-    })
+
+        //Delete store
+        const delRes = await request(app)
+            .delete(`/api/franchise/${franchiseId}/store/${createRes.body.id}`)
+            .set('Authorization', `Bearer ${adminUser.token}`);
+        expect(delRes.status).toBe(200);
+        expect(delRes.body.message).toBe('store deleted');
+    });
 
     test('deleteFranchise', async () => {
         const adminUser = await createAdminUser();
