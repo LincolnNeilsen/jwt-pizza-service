@@ -12,8 +12,7 @@ class DB {
   async getMenu() {
     const connection = await this.getConnection();
     try {
-      const rows = await this.query(connection, `SELECT * FROM menu`);
-      return rows;
+      return await this.query(connection, `SELECT * FROM menu`);
     } finally {
       connection.end();
     }
@@ -71,6 +70,31 @@ class DB {
 
       return { ...user, roles: roles, password: undefined };
     } finally {
+      connection.end();
+    }
+  }
+
+    async listUsers({page = 1, pageSize = 10, name,}){
+    const connection = await this.getConnection();
+    try{
+        const offset = this.getOffset(page, pageSize);
+
+        const params = [];
+        let whereClause = '';
+
+        if(name){
+            whereClause = `WHERE name LIKE ?`;
+            params.push(`%${name}%`);
+        }
+        const users = await this.query(connection,  `SELECT * FROM user ${whereClause} LIMIT ${pageSize} OFFSET ${offset}`, params);
+        const totalCount = await this.query(connection, `SELECT COUNT(*) AS totalCount FROM user ${whereClause}`, params);
+        return {
+            users,
+            total: totalCount[0].totalCount,
+            page,
+            pageSize,
+        };
+    }finally{
       connection.end();
     }
   }

@@ -52,7 +52,6 @@ userRouter.get(
 );
 
 // updateUser
-params.userId = undefined;
 userRouter.put(
     '/:userId',
     authRouter.authenticateToken,
@@ -84,7 +83,17 @@ userRouter.get(
     '/',
     authRouter.authenticateToken,
     asyncHandler(async (req, res) => {
-        res.json({});
+        if (!req.user.isRole(Role.Admin)) {
+            return res.status(403).json({message: 'unauthorized'});
+        }
+
+        const page = Number(req.query.page) || 1;
+        const pageSize = Number(req.query.pageSize) || 10;
+        const name = req.query.name;
+
+        const result = await DB.listUsers({page, pageSize, name});
+
+        res.json(result);
     })
 );
 

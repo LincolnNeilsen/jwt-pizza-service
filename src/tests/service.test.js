@@ -428,9 +428,15 @@ test('unauthorized list users', async () => {
     expect(listUsersRes.status).toBe(401);
 });
 test('list users', async () => {
-    const [user, userToken] = await registerUser(request(app));
+    const adminUser = await createAdminUser();
+
     const listUsersRes = await request(app)
         .get('/api/user')
-        .set('Authorization', 'Bearer ' + userToken);
+        .set('Authorization', 'Bearer ' + adminUser.token);
+
     expect(listUsersRes.status).toBe(200);
+    expect(listUsersRes.body.users).toBeDefined();
+
+    expect(listUsersRes.body.total).toBeDefined();
+    expect(typeof listUsersRes.body.total).toBe('number');
 });
