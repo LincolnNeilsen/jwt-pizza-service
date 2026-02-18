@@ -77,7 +77,7 @@ class DB {
     async listUsers({page = 1, pageSize = 10, name,}){
     const connection = await this.getConnection();
     try{
-        const offset = this.getOffset(page, pageSize);
+        const offset = (page - 1) * pageSize;
 
         const params = [];
         let whereClause = '';
@@ -86,8 +86,14 @@ class DB {
             whereClause = `WHERE name LIKE ?`;
             params.push(`%${name}%`);
         }
-        const users = await this.query(connection,  `SELECT * FROM user ${whereClause} LIMIT ${pageSize} OFFSET ${offset}`, params);
+        const users = await this.query(connection,  `SELECT id, name, email FROM user ${whereClause} LIMIT ${pageSize} OFFSET ${offset}`, params);
         const totalCount = await this.query(connection, `SELECT COUNT(*) AS totalCount FROM user ${whereClause}`, params);
+
+        for (const user of users) {
+          const roleResult = await this.query(connection, `SELECT role FROM userRole WHERE userId=?`, [user.id]);
+          user.roles = roleResult.map((r) => ({ role: r.role }));
+        }
+
         return {
             users,
             total: totalCount[0].totalCount,
@@ -102,25 +108,44 @@ class DB {
   async updateUser(userId, name, email, password) {
     const connection = await this.getConnection();
     try {
+      const updates = [];
       const params = [];
       if (password) {
         const hashedPassword = await bcrypt.hash(password, 10);
-        params.push(`password='${hashedPassword}'`);
+        updates.push(`password=?`);
+        params.push(hashedPassword);
       }
       if (email) {
-        params.push(`email='${email}'`);
+        updates.push(`email=?`);
+        params.push(email);
       }
       if (name) {
-        params.push(`name='${name}'`);
+        updates.push(`name=?`);
+        params.push(name);
       }
-      if (params.length > 0) {
-        const query = `UPDATE user SET ${params.join(', ')} WHERE id=${userId}`;
-        await this.query(connection, query);
+      if (updates.length > 0) {
+        params.push(userId);
+        const query = `UPDATE user SET ${updates.join(', ')} WHERE id=?`;
+        await this.query(connection, query, params);
       }
-      return this.getUser(email, password);
+      const user = await this.getUserById(connection, userId);
+      return user;
     } finally {
       connection.end();
     }
+  }
+
+  async getUserById(connection, userId) {
+    const userResult = await this.query(connection, `SELECT * FROM user WHERE id=?`, [userId]);
+    if (userResult.length === 0) return null;
+    const user = userResult[0];
+
+    const roleResult = await this.query(connection, `SELECT role FROM userRole WHERE userId=?`, [userId]);
+    const roles = roleResult.map((r) => {
+      return { role: r.role };
+    });
+
+    return { ...user, roles: roles, password: undefined };
   }
 
   async loginUser(userId, token) {

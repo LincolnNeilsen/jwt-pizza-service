@@ -2,7 +2,6 @@ const express = require('express');
 const {asyncHandler} = require('../endpointHelper.js');
 const {DB, Role} = require('../database/database.js');
 const {authRouter, setAuth} = require('./authRouter.js');
-const {params} = require("express/lib/request");
 
 const userRouter = express.Router();
 
@@ -25,7 +24,7 @@ userRouter.docs = [
     },
     {
         method: 'GET',
-        path: '/api/user?page=1&limit=10&name=*',
+        path: '/api/user?page=1&pageSize=10&name=*',
         requiresAuth: true,
         description: 'Gets a list of users',
         example: `curl -X GET localhost:3000/api/user -H 'Authorization: Bearer tttttt'`,

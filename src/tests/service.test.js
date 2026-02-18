@@ -427,16 +427,43 @@ test('unauthorized list users', async () => {
     const listUsersRes = await request(app).get('/api/user');
     expect(listUsersRes.status).toBe(401);
 });
-test('list users', async () => {
+test('list users pagination and filtering', async () => {
     const adminUser = await createAdminUser();
+    const nameToSearch = randomName();
+    const user1 = {
+        name: nameToSearch + ' One',
+        email: randomName() + '@test.com',
+        password: 'password',
+        roles: [{role: Role.Diner}]
+    };
+    const user2 = {
+        name: nameToSearch + ' Two',
+        email: randomName() + '@test.com',
+        password: 'password',
+        roles: [{role: Role.Diner}]
+    };
+    await DB.addUser(user1);
+    await DB.addUser(user2);
 
-    const listUsersRes = await request(app)
-        .get('/api/user')
+    // Test filtering by name
+    const filterRes = await request(app)
+        .get(`/api/user?name=${nameToSearch}`)
         .set('Authorization', 'Bearer ' + adminUser.token);
 
-    expect(listUsersRes.status).toBe(200);
-    expect(listUsersRes.body.users).toBeDefined();
+    expect(filterRes.status).toBe(200);
+    expect(filterRes.body.users.length).toBeGreaterThanOrEqual(2);
+    filterRes.body.users.forEach(u => {
+        expect(u.name.toLowerCase()).toContain(nameToSearch.toLowerCase());
+    });
 
-    expect(listUsersRes.body.total).toBeDefined();
-    expect(typeof listUsersRes.body.total).toBe('number');
+    // Test pagination
+    const pageRes = await request(app)
+        .get(`/api/user?page=1&pageSize=1`)
+        .set('Authorization', 'Bearer ' + adminUser.token);
+
+    expect(pageRes.status).toBe(200);
+    expect(pageRes.body.users.length).toBe(1);
+    expect(pageRes.body.page).toBe(1);
+    expect(pageRes.body.pageSize).toBe(1);
+    expect(pageRes.body.total).toBeGreaterThanOrEqual(3); // admin + 2 new users
 });
