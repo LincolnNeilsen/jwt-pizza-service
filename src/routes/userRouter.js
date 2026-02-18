@@ -24,7 +24,7 @@ userRouter.docs = [
     },
     {
         method: 'GET',
-        path: '/api/user?page=1&pageSize=10&name=*',
+        path: '/api/user?page=1&limit=10&name=*',
         requiresAuth: true,
         description: 'Gets a list of users',
         example: `curl -X GET localhost:3000/api/user -H 'Authorization: Bearer tttttt'`,
@@ -87,10 +87,10 @@ userRouter.get(
         }
 
         const page = Number(req.query.page) || 1;
-        const pageSize = Number(req.query.pageSize) || 10;
+        const limit = Number(req.query.limit) || 10;
         const name = req.query.name;
 
-        const result = await DB.listUsers({page, pageSize, name});
+        const result = await DB.listUsers({page, limit, name});
 
         res.json(result);
     })
