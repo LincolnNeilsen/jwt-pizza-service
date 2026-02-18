@@ -352,6 +352,18 @@ class DB {
     }
   }
 
+  async deleteUser(userId){
+    const connection = await this.getConnection();
+    try {
+      // Delete roles first
+      await this.query(connection, 'DELETE FROM userRole WHERE userId=?', [userId]);
+      // Then delete user
+      await this.query(connection, 'DELETE FROM user WHERE id=?', [userId]);
+    } finally {
+      connection.end();
+    }
+  }
+
   getOffset(currentPage = 1, listPerPage) {
     return (currentPage - 1) * [listPerPage];
   }

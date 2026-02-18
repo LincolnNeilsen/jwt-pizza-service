@@ -470,3 +470,30 @@ test('list users pagination and filtering', async () => {
     expect(pageRes.body.users[0].roles).toBeDefined();
     expect(pageRes.body.users[0].roles.length).toBeGreaterThan(0);
 });
+
+test('delete user (unauthorized)', async () => {
+    const user = await createUserAndLogin();
+    const deleteUserRes = await request(app)
+        .delete(`/api/user/${user.id}`)
+        .set('Authorization', 'Bearer ' + user.token);
+    expect(deleteUserRes.status).toBe(403);
+    expect(deleteUserRes.body.message).toBe('unauthorized');
+});
+
+test('delete user', async () => {
+    const adminUser = await createAdminUser();
+    const userToDelete = await createUserAndLogin();
+
+    const deleteUserRes = await request(app)
+        .delete(`/api/user/${userToDelete.id}`)
+        .set('Authorization', 'Bearer ' + adminUser.token);
+
+    expect(deleteUserRes.status).toBe(200);
+    expect(deleteUserRes.body.message).toBe(`User ${userToDelete.id} deleted`);
+
+    // Verify user is gone
+    const loginRes = await request(app)
+        .put('/api/auth')
+        .send({email: userToDelete.email, password: userToDelete.password});
+    expect(loginRes.status).toBe(404);
+});
