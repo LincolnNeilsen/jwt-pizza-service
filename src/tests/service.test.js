@@ -302,6 +302,8 @@ test('getMe', async () => {
 
     expect(res.status).toBe(200);
     expect(res.body.email).toBe(user.email);
+    expect(res.body.roles).toBeDefined();
+    expect(res.body.roles.length).toBeGreaterThan(0);
 });
 
 test('getUserFranchises', async () => {
@@ -458,12 +460,13 @@ test('list users pagination and filtering', async () => {
 
     // Test pagination
     const pageRes = await request(app)
-        .get(`/api/user?page=1&pageSize=1`)
+        .get(`/api/user?page=0&limit=1`)
         .set('Authorization', 'Bearer ' + adminUser.token);
 
     expect(pageRes.status).toBe(200);
     expect(pageRes.body.users.length).toBe(1);
-    expect(pageRes.body.page).toBe(1);
-    expect(pageRes.body.pageSize).toBe(1);
-    expect(pageRes.body.total).toBeGreaterThanOrEqual(3); // admin + 2 new users
+    expect(pageRes.body.more).toBeDefined();
+    expect(typeof pageRes.body.more).toBe('boolean');
+    expect(pageRes.body.users[0].roles).toBeDefined();
+    expect(pageRes.body.users[0].roles.length).toBeGreaterThan(0);
 });

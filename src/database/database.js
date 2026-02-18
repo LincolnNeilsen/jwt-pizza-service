@@ -74,36 +74,48 @@ class DB {
     }
   }
 
-    async listUsers({page = 1, pageSize = 10, name,}){
+  async listUsers({ page = 0, limit = 10, name }) {
     const connection = await this.getConnection();
-    try{
-        const offset = (page - 1) * pageSize;
 
-        const params = [];
-        let whereClause = '';
+    const offset = page * limit;
+    if (!name) {
+      name = '%';
+    } else if (name.includes('*')) {
+      name = name.replace(/\*/g, '%');
+    } else {
+      name = `%${name}%`;
+    }
 
-        if(name){
-            whereClause = `WHERE name LIKE ?`;
-            params.push(`%${name}%`);
-        }
-        const users = await this.query(connection,  `SELECT id, name, email FROM user ${whereClause} LIMIT ${pageSize} OFFSET ${offset}`, params);
-        const totalCount = await this.query(connection, `SELECT COUNT(*) AS totalCount FROM user ${whereClause}`, params);
+    try {
+      let users = await this.query(
+          connection,
+          `SELECT id, name, email FROM user WHERE name LIKE ? LIMIT ${limit + 1} OFFSET ${offset}`, [name]
+      );
 
-        for (const user of users) {
-          const roleResult = await this.query(connection, `SELECT role FROM userRole WHERE userId=?`, [user.id]);
-          user.roles = roleResult.map((r) => ({ role: r.role }));
-        }
+      const more = users.length > limit;
 
-        return {
-            users,
-            total: totalCount[0].totalCount,
-            page,
-            pageSize,
-        };
-    }finally{
+      if (more) {
+        users = users.slice(0, limit);
+      }
+
+      for (const user of users) {
+        const roleResult = await this.query(
+            connection,
+            `SELECT role FROM userRole WHERE userId=?`,
+            [user.id]
+        );
+        user.roles = roleResult.map(r => ({ role: r.role }));
+      }
+
+      return {
+        users,
+        more,
+      };
+    } finally {
       connection.end();
     }
   }
+
 
   async updateUser(userId, name, email, password) {
     const connection = await this.getConnection();
@@ -136,16 +148,26 @@ class DB {
   }
 
   async getUserById(connection, userId) {
-    const userResult = await this.query(connection, `SELECT * FROM user WHERE id=?`, [userId]);
-    if (userResult.length === 0) return null;
-    const user = userResult[0];
+    let connectionInternal = connection;
+    if (!connectionInternal) {
+      connectionInternal = await this.getConnection();
+    }
+    try {
+      const userResult = await this.query(connectionInternal, `SELECT * FROM user WHERE id=?`, [userId]);
+      if (userResult.length === 0) return null;
+      const user = userResult[0];
 
-    const roleResult = await this.query(connection, `SELECT role FROM userRole WHERE userId=?`, [userId]);
-    const roles = roleResult.map((r) => {
-      return { role: r.role };
-    });
+      const roleResult = await this.query(connectionInternal, `SELECT role FROM userRole WHERE userId=?`, [userId]);
+      const roles = roleResult.map((r) => {
+        return {role: r.role};
+      });
 
-    return { ...user, roles: roles, password: undefined };
+      return {...user, roles: roles, password: undefined};
+    } finally {
+      if (!connection) {
+        connectionInternal.end();
+      }
+    }
   }
 
   async loginUser(userId, token) {
