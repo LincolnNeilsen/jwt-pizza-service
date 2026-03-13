@@ -2,6 +2,7 @@ const config = require('./config');
 const os = require('os');
 const requests = {};
 const requestsByMethod = {};
+const activeUsers = {};
 
 function getCpuUsagePercentage() {
     const cpuUsage = os.loadavg()[0] / os.cpus().length;
@@ -29,21 +30,42 @@ function requestTracker(req, res, next) {
     // requests by HTTP method
     requestsByMethod[req.method] = (requestsByMethod[req.method] || 0) + 1;
 
+    //active users
+    trackActiveUser(req);
+
     next();
 }
 
+function trackActiveUser(req) {
+    console.log("REQ USER:", req.user);
+    if (!req.user) return;
+
+    activeUsers[req.user.id] = Date.now();
+}
+
+function getActiveUserCount() {
+    const now = Date.now();
+    const fiveMinutes = 5 * 60 * 1000;
+
+    return Object.values(activeUsers)
+        .filter(lastSeen => now - lastSeen < fiveMinutes)
+        .length;
+}
 
 // This will periodically send metrics to Grafana
 setInterval(() => {
     const metrics = [];
     Object.keys(requests).forEach((endpoint) => {
-        metrics.push(createMetric('requests', requests[endpoint], '1', 'sum', 'asInt', { endpoint }));
+        metrics.push(createMetric('requests', requests[endpoint], '1', 'sum', 'asInt', {endpoint}));
     });
 
     // total requests per HTTP method
     Object.keys(requestsByMethod).forEach((method) => {
-        metrics.push(createMetric('requestsByMethod', requestsByMethod[method], '1', 'sum', 'asInt', { method }));
+        metrics.push(createMetric('requestsByMethod', requestsByMethod[method], '1', 'sum', 'asInt', {method}));
     });
+
+    //active users
+    metrics.push(createMetric('activeUsers', getActiveUserCount(), '1', 'gauge', 'asInt', {}));
 
     //CPU and Memory
     metrics.push(createMetric('cpuUsage', getCpuUsagePercentage(), '%', 'gauge', 'asDouble', {}));
@@ -54,7 +76,7 @@ setInterval(() => {
 }, 10000);
 
 function createMetric(metricName, metricValue, metricUnit, metricType, valueType, attributes) {
-    attributes = { ...attributes, source: config.metrics.source };
+    attributes = {...attributes, source: config.metrics.source};
 
     const metric = {
         name: metricName,
@@ -73,7 +95,7 @@ function createMetric(metricName, metricValue, metricUnit, metricType, valueType
     Object.keys(attributes).forEach((key) => {
         metric[metricType].dataPoints[0].attributes.push({
             key: key,
-            value: { stringValue: attributes[key] },
+            value: {stringValue: attributes[key]},
         });
     });
 
@@ -101,7 +123,7 @@ function sendMetricToGrafana(metrics) {
     fetch(`${config.metrics.endpointUrl}`, {
         method: 'POST',
         body: JSON.stringify(body),
-        headers: { Authorization: `Bearer ${config.metrics.accountId}:${config.metrics.apiKey}`, 'Content-Type': 'application/json' },
+        headers: {Authorization: `Bearer ${config.metrics.accountId}:${config.metrics.apiKey}`, 'Content-Type': 'application/json'},
     })
         .then((response) => {
             if (!response.ok) {
@@ -112,4 +134,5 @@ function sendMetricToGrafana(metrics) {
             console.error('Error pushing metrics:', error);
         });
 }
-module.exports = { requestTracker};
+
+module.exports = {requestTracker};
