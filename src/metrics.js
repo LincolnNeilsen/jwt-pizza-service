@@ -3,6 +3,10 @@ const os = require('os');
 const requests = {};
 const requestsByMethod = {};
 const activeUsers = {};
+const authAttempts = {
+    success: 0,
+    failure: 0
+};
 
 function getCpuUsagePercentage() {
     const cpuUsage = os.loadavg()[0] / os.cpus().length;
@@ -52,6 +56,14 @@ function getActiveUserCount() {
         .length;
 }
 
+function authAttempt(success) {
+    if (success) {
+        authAttempts.success += 1;
+    } else {
+        authAttempts.failure += 1;
+    }
+}
+
 // This will periodically send metrics to Grafana
 setInterval(() => {
     const metrics = [];
@@ -70,6 +82,10 @@ setInterval(() => {
     //CPU and Memory
     metrics.push(createMetric('cpuUsage', getCpuUsagePercentage(), '%', 'gauge', 'asDouble', {}));
     metrics.push(createMetric('memoryUsage', getMemoryUsagePercentage(), '%', 'gauge', 'asDouble', {}));
+
+    // authentication attempts
+    metrics.push(createMetric('authAttempts', authAttempts.success, '1', 'sum', 'asInt', { result: 'success' }));
+    metrics.push(createMetric('authAttempts', authAttempts.failure, '1', 'sum', 'asInt', { result: 'failure' }));
 
     console.log(JSON.stringify(metrics, null, 2));
     sendMetricToGrafana(metrics);
@@ -135,4 +151,4 @@ function sendMetricToGrafana(metrics) {
         });
 }
 
-module.exports = {requestTracker};
+module.exports = {requestTracker, authAttempt};

@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const config = require('../config.js');
 const { asyncHandler } = require('../endpointHelper.js');
 const { DB, Role } = require('../database/database.js');
+const metrics = require('../metrics');
 
 const authRouter = express.Router();
 
@@ -95,6 +96,7 @@ authRouter.delete(
 async function setAuth(user) {
   const token = jwt.sign(user, config.jwtSecret);
   await DB.loginUser(user.id, token);
+  metrics.authAttempt(true);
   return token;
 }
 
