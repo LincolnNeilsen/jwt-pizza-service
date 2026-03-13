@@ -1,5 +1,6 @@
 const config = require('./config');
 const os = require('os');
+const requests = {};
 
 function getCpuUsagePercentage() {
     const cpuUsage = os.loadavg()[0] / os.cpus().length;
@@ -28,7 +29,8 @@ setInterval(() => {
         metrics.push(createMetric('requests', requests[endpoint], '1', 'sum', 'asInt', { endpoint }));
     });
 
-    metrics.push(createMetric('greetingChange', greetingChangedCount, '1', 'sum', 'asInt', {}));
+    metrics.push(createMetric('cpuUsage', getCpuUsagePercentage(), '%', 'gauge', 'asDouble', {}));
+    metrics.push(createMetric('memoryUsage', getMemoryUsagePercentage(), '%', 'gauge', 'asDouble', {}));
 
     sendMetricToGrafana(metrics);
 }, 10000);
@@ -78,10 +80,10 @@ function sendMetricToGrafana(metrics) {
         ],
     };
 
-    fetch(`${config.endpointUrl}`, {
+    fetch(`${config.metrics.endpointUrl}`, {
         method: 'POST',
         body: JSON.stringify(body),
-        headers: { Authorization: `Bearer ${config.accountId}:${config.apiKey}`, 'Content-Type': 'application/json' },
+        headers: { Authorization: `Bearer ${config.metrics.accountId}:${config.metrics.apiKey}`, 'Content-Type': 'application/json' },
     })
         .then((response) => {
             if (!response.ok) {
@@ -92,4 +94,4 @@ function sendMetricToGrafana(metrics) {
             console.error('Error pushing metrics:', error);
         });
 }
-module.exports = { requestTracker, greetingChanged };
+module.exports = { requestTracker};
