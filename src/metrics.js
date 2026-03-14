@@ -137,7 +137,7 @@ function sendMetrics() {
             }
         });
 
-        console.log(JSON.stringify(metrics, null, 2));
+        //console.log(JSON.stringify(metrics, null, 2)); // log metrics to console
         sendMetricToGrafana(metrics);
     }, 10000);
 }
