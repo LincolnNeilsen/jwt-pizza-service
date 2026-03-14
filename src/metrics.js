@@ -18,7 +18,7 @@ const endpointLatency = {};
 
 function getCpuUsagePercentage() {
     const cpuUsage = os.loadavg()[0] / os.cpus().length;
-    return cpuUsage.toFixed(2) * 100;
+    return parseFloat((cpuUsage * 100).toFixed(2));
 }
 
 function getMemoryUsagePercentage() {
@@ -26,7 +26,7 @@ function getMemoryUsagePercentage() {
     const freeMemory = os.freemem();
     const usedMemory = totalMemory - freeMemory;
     const memoryUsage = (usedMemory / totalMemory) * 100;
-    return memoryUsage.toFixed(2);
+    return parseFloat(memoryUsage.toFixed(2));
 }
 
 function requestTracker(req, res, next) {
@@ -168,7 +168,6 @@ function createMetric(metricName, metricValue, metricUnit, metricType, valueType
 
     if (metricType === 'sum') {
         metric[metricType].aggregationTemporality = 'AGGREGATION_TEMPORALITY_CUMULATIVE';
-        metric[metricType].isMonotonic = true;
     }
 
     return metric;
@@ -190,7 +189,10 @@ function sendMetricToGrafana(metrics) {
     fetch(`${config.metrics.endpointUrl}`, {
         method: 'POST',
         body: JSON.stringify(body),
-        headers: {Authorization: `Bearer ${config.metrics.accountId}:${config.metrics.apiKey}`, 'Content-Type': 'application/json'},
+        headers: {
+            Authorization: `Basic ${Buffer.from(`${config.metrics.accountId}:${config.metrics.apiKey}`).toString('base64')}`,
+            'Content-Type': 'application/json'
+        },
     })
         .then((response) => {
             if (!response.ok) {
