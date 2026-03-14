@@ -7,7 +7,7 @@ const authAttempts = {
     success: 0,
     failure: 0
 };
-const pizzaMetrics ={
+const pizzaMetrics = {
     success: 0,
     failure: 0,
     revenue: 0,
@@ -83,44 +83,46 @@ function pizzaPurchase(success, latency = 0, price = 0, count = 0) {
 }
 
 // This will periodically send metrics to Grafana
-setInterval(() => {
-    const metrics = [];
-    Object.keys(requests).forEach((endpoint) => {
-        metrics.push(createMetric('requests', requests[endpoint], '1', 'sum', 'asInt', {endpoint}));
-    });
+function sendMetrics() {
+    setInterval(() => {
+        const metrics = [];
+        Object.keys(requests).forEach((endpoint) => {
+            metrics.push(createMetric('requests', requests[endpoint], '1', 'sum', 'asInt', {endpoint}));
+        });
 
-    // total requests per HTTP method
-    Object.keys(requestsByMethod).forEach((method) => {
-        metrics.push(createMetric('requestsByMethod', requestsByMethod[method], '1', 'sum', 'asInt', {method}));
-    });
+        // total requests per HTTP method
+        Object.keys(requestsByMethod).forEach((method) => {
+            metrics.push(createMetric('requestsByMethod', requestsByMethod[method], '1', 'sum', 'asInt', {method}));
+        });
 
-    //active users
-    metrics.push(createMetric('activeUsers', getActiveUserCount(), '1', 'gauge', 'asInt', {}));
+        //active users
+        metrics.push(createMetric('activeUsers', getActiveUserCount(), '1', 'gauge', 'asInt', {}));
 
-    //CPU and Memory
-    metrics.push(createMetric('cpuUsage', getCpuUsagePercentage(), '%', 'gauge', 'asDouble', {}));
-    metrics.push(createMetric('memoryUsage', getMemoryUsagePercentage(), '%', 'gauge', 'asDouble', {}));
+        //CPU and Memory
+        metrics.push(createMetric('cpuUsage', getCpuUsagePercentage(), '%', 'gauge', 'asDouble', {}));
+        metrics.push(createMetric('memoryUsage', getMemoryUsagePercentage(), '%', 'gauge', 'asDouble', {}));
 
-    // authentication attempts
-    metrics.push(createMetric('authAttempts', authAttempts.success, '1', 'sum', 'asInt', { result: 'success' }));
-    metrics.push(createMetric('authAttempts', authAttempts.failure, '1', 'sum', 'asInt', { result: 'failure' }));
+        // authentication attempts
+        metrics.push(createMetric('authAttempts', authAttempts.success, '1', 'sum', 'asInt', {result: 'success'}));
+        metrics.push(createMetric('authAttempts', authAttempts.failure, '1', 'sum', 'asInt', {result: 'failure'}));
 
 
-    // pizza purchase metrics
-    metrics.push(createMetric('pizzaPurchases', pizzaMetrics.success, '1', 'sum', 'asInt', { result: 'success' }));
-    metrics.push(createMetric('pizzaPurchases', pizzaMetrics.failure, '1', 'sum', 'asInt', { result: 'failure' }));
+        // pizza purchase metrics
+        metrics.push(createMetric('pizzaPurchases', pizzaMetrics.success, '1', 'sum', 'asInt', {result: 'success'}));
+        metrics.push(createMetric('pizzaPurchases', pizzaMetrics.failure, '1', 'sum', 'asInt', {result: 'failure'}));
 
-    metrics.push(createMetric('pizzaRevenue', pizzaMetrics.revenue, 'BTC', 'sum', 'asDouble', {}));
+        metrics.push(createMetric('pizzaRevenue', pizzaMetrics.revenue, 'BTC', 'sum', 'asDouble', {}));
 
-    metrics.push(createMetric('pizzaCount', pizzaMetrics.pizzaCount, '1', 'sum', 'asInt', {}));
+        metrics.push(createMetric('pizzaCount', pizzaMetrics.pizzaCount, '1', 'sum', 'asInt', {}));
 
-    if (pizzaMetrics.success > 0) {
-        metrics.push(createMetric('pizzaLatency',pizzaMetrics.latency, 'ms', 'gauge', 'asDouble', {}));
-    }
+        if (pizzaMetrics.success > 0) {
+            metrics.push(createMetric('pizzaLatency', pizzaMetrics.latency, 'ms', 'gauge', 'asDouble', {}));
+        }
 
-    console.log(JSON.stringify(metrics, null, 2));
-    sendMetricToGrafana(metrics);
-}, 10000);
+        console.log(JSON.stringify(metrics, null, 2));
+        sendMetricToGrafana(metrics);
+    }, 10000);
+}
 
 function createMetric(metricName, metricValue, metricUnit, metricType, valueType, attributes) {
     attributes = {...attributes, source: config.metrics.source};
@@ -182,4 +184,4 @@ function sendMetricToGrafana(metrics) {
         });
 }
 
-module.exports = {requestTracker, authAttempt, pizzaPurchase};
+module.exports = {requestTracker, authAttempt, pizzaPurchase, sendMetrics};

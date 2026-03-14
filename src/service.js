@@ -6,6 +6,9 @@ const userRouter = require('./routes/userRouter.js');
 const version = require('./version.json');
 const config = require('./config.js');
 const metrics = require('./metrics'); // adjust path if needed
+if (process.env.NODE_ENV !== 'test') {
+  metrics.sendMetrics();
+}
 
 const app = express();
 app.use(express.json());
