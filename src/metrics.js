@@ -14,6 +14,7 @@ const pizzaMetrics = {
     pizzaCount: 0,
     latency: 0
 };
+const endpointLatency = {};
 
 function getCpuUsagePercentage() {
     const cpuUsage = os.loadavg()[0] / os.cpus().length;
@@ -30,6 +31,7 @@ function getMemoryUsagePercentage() {
 
 function requestTracker(req, res, next) {
     const endpoint = `[${req.method}] ${req.path}`;
+    const start = Date.now();
 
     if (req.method === 'OPTIONS') {
         return next(); // skip counting OPTIONS requests
@@ -43,6 +45,13 @@ function requestTracker(req, res, next) {
 
     //active users
     trackActiveUser(req);
+    res.on('finish', () => {
+        if (!endpointLatency[endpoint]) {
+            endpointLatency[endpoint] = { total: 0, count: 0 };
+        }
+        endpointLatency[endpoint].total += Date.now() - start;
+        endpointLatency[endpoint].count += 1;
+    });
 
     next();
 }
@@ -118,6 +127,15 @@ function sendMetrics() {
         if (pizzaMetrics.success > 0) {
             metrics.push(createMetric('pizzaLatency', pizzaMetrics.latency, 'ms', 'gauge', 'asDouble', {}));
         }
+
+        // endpoint latency metrics
+        Object.keys(endpointLatency).forEach((endpoint) => {
+            const { total, count } = endpointLatency[endpoint];
+            if (count > 0) {
+                const avgLatency = total / count;
+                metrics.push(createMetric('endpointLatency', avgLatency, 'ms', 'gauge', 'asDouble', { endpoint }));
+            }
+        });
 
         console.log(JSON.stringify(metrics, null, 2));
         sendMetricToGrafana(metrics);
