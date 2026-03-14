@@ -13,7 +13,7 @@ const pizzaMetrics ={
     revenue: 0,
     pizzaCount: 0,
     latency: 0
-}
+};
 
 function getCpuUsagePercentage() {
     const cpuUsage = os.loadavg()[0] / os.cpus().length;

@@ -92,7 +92,7 @@ orderRouter.post(
         if (r.ok) {
             const price = orderReq.items?.reduce((acc, item) => acc + item.price, 0) || 0;
             const count = orderReq.items?.length || 0;
-            metrics.pizzaPurchase(true, latency, price, count)
+            metrics.pizzaPurchase(true, latency, price, count);
             res.send({order, followLinkToEndChaos: j.reportUrl, jwt: j.jwt});
         } else {
             metrics.pizzaPurchase(false, latency);
