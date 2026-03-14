@@ -18,8 +18,8 @@ module.exports = {
     },
     metrics: {
         source: 'jwt-pizza-service-app',
-        endpointUrl: '${{ secrets.METRICS_ENDPOINT_URL }}',
-        apiKey: '${{ secrets.METRICS_API_KEY }}',
-        accountId: '${{ secrets.METRICS_ACCOUNT_ID_KEY }}',
+        endpointUrl: process.env.METRICS_ENDPOINT_URL,
+        apiKey: process.env.METRICS_API_KEY,
+        accountId: process.env.METRICS_ACCOUNT_ID_KEY,
     }
 };
