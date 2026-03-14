@@ -17,9 +17,9 @@ module.exports = {
         apiKey: '0f6b9033a28d49f897be1313a52322cd',
     },
     metrics: {
-        source: 'jwt-pizza-service-dev',
-        endpointUrl: process.env.METRICS_ENDPOINT_URL,
-        accountId: process.env.METRICS_ACCOUNT_ID_KEY,
-        apiKey: process.env.METRICS_API_KEY,
+        source: 'jwt-pizza-service-app',
+        endpointUrl: '${{ secrets.METRICS_ENDPOINT_URL }}',
+        apiKey: '${{ secrets.METRICS_API_KEY }}',
+        accountId: '${{ secrets.METRICS_ACCOUNT_ID_KEY }}',
     }
 };
