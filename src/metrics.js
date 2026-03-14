@@ -7,6 +7,13 @@ const authAttempts = {
     success: 0,
     failure: 0
 };
+const pizzaMetrics ={
+    success: 0,
+    failure: 0,
+    revenue: 0,
+    pizzaCount: 0,
+    latency: 0
+}
 
 function getCpuUsagePercentage() {
     const cpuUsage = os.loadavg()[0] / os.cpus().length;
@@ -41,7 +48,6 @@ function requestTracker(req, res, next) {
 }
 
 function trackActiveUser(req) {
-    console.log("REQ USER:", req.user);
     if (!req.user) return;
 
     activeUsers[req.user.id] = Date.now();
@@ -61,6 +67,18 @@ function authAttempt(success) {
         authAttempts.success += 1;
     } else {
         authAttempts.failure += 1;
+    }
+}
+
+function pizzaPurchase(success, latency = 0, price = 0, count = 0) {
+    if (success) {
+        pizzaMetrics.success += 1;
+        pizzaMetrics.revenue += price;
+        pizzaMetrics.pizzaCount += count;
+        pizzaMetrics.latency += latency;
+    } else {
+        pizzaMetrics.failure += 1;
+        pizzaMetrics.latency += latency;
     }
 }
 
@@ -86,6 +104,19 @@ setInterval(() => {
     // authentication attempts
     metrics.push(createMetric('authAttempts', authAttempts.success, '1', 'sum', 'asInt', { result: 'success' }));
     metrics.push(createMetric('authAttempts', authAttempts.failure, '1', 'sum', 'asInt', { result: 'failure' }));
+
+
+    // pizza purchase metrics
+    metrics.push(createMetric('pizzaPurchases', pizzaMetrics.success, '1', 'sum', 'asInt', { result: 'success' }));
+    metrics.push(createMetric('pizzaPurchases', pizzaMetrics.failure, '1', 'sum', 'asInt', { result: 'failure' }));
+
+    metrics.push(createMetric('pizzaRevenue', pizzaMetrics.revenue, 'BTC', 'sum', 'asDouble', {}));
+
+    metrics.push(createMetric('pizzaCount', pizzaMetrics.pizzaCount, '1', 'sum', 'asInt', {}));
+
+    if (pizzaMetrics.success > 0) {
+        metrics.push(createMetric('pizzaLatency',pizzaMetrics.latency, 'ms', 'gauge', 'asDouble', {}));
+    }
 
     console.log(JSON.stringify(metrics, null, 2));
     sendMetricToGrafana(metrics);
@@ -151,4 +182,4 @@ function sendMetricToGrafana(metrics) {
         });
 }
 
-module.exports = {requestTracker, authAttempt};
+module.exports = {requestTracker, authAttempt, pizzaPurchase};
