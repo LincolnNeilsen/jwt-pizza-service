@@ -137,7 +137,7 @@ function sendMetrics() {
             }
         });
 
-        console.log('Sending metrics to Grafana:', JSON.stringify(metrics, null, 2)); // log metrics to console
+        //console.log('Sending metrics to Grafana:', JSON.stringify(metrics, null, 2)); // log metrics to console
         sendMetricToGrafana(metrics);
     }, 10000);
 }
@@ -199,7 +199,7 @@ function sendMetricToGrafana(metrics) {
                 console.error('Error pushing metrics to Grafana. Status:', response.status);
                 throw new Error(`HTTP status: ${response.status}`);
             } else {
-                console.log('Successfully pushed metrics to Grafana');
+                //console.log('Successfully pushed metrics to Grafana');
             }
         })
         .catch((error) => {
