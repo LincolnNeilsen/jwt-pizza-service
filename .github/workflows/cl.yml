@@ -137,13 +137,4 @@ jobs:
       - name: Deploy new container
         run: |
           aws ecs update-service --cluster jwt-pizza-service --service jwt-pizza-service --force-new-deployment
-            --container-overrides '[
-            {
-              "name": "jwt-pizza-service",
-              "environment": [
-                {"name": "METRICS_ENDPOINT_URL","value":"'"${{ secrets.METRICS_ENDPOINT_URL }}"'"},
-                {"name": "METRICS_API_KEY","value":"'"${{ secrets.METRICS_API_KEY }}"'"},
-                {"name": "METRICS_ACCOUNT_ID_KEY","value":"'"${{ secrets.METRICS_ACCOUNT_ID_KEY }}"'"}
-              ]'
-            }
 
