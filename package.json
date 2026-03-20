@@ -13,7 +13,8 @@
     "bcrypt": "^5.1.1",
     "express": "^4.22.1",
     "jsonwebtoken": "^9.0.3",
-    "mysql2": "^3.16.0"
+    "mysql2": "^3.16.0",
+    "pizza-logger": "^1.0.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
