@@ -37,6 +37,8 @@ class Logger {
     }
 
     log(level, type, logData) {
+        if(process.env.NODE_ENV === 'test') return;
+
         const labels = {component: this.config.logging.source, level: level, type: type};
         const values = [this.nowString(), this.sanitize(logData)];
         const logEvent = {streams: [{stream: labels, values: [values]}]};

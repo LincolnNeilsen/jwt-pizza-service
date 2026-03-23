@@ -6,8 +6,8 @@ const userRouter = require('./routes/userRouter.js');
 const version = require('./version.json');
 const config = require('./config.js');
 const metrics = require('./metrics');
-const  logging = require('./logger');
-const logger = new logging();
+const  Logging = require('./logger');
+const logger = new Logging();
 if (process.env.NODE_ENV !== 'test') {
   metrics.sendMetrics();
 }
