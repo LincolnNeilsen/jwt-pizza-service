@@ -394,7 +394,7 @@ class DB {
               sql: sql,
               params: params,
               error: err.message
-          })
+          });
           throw err;
       }
   }
