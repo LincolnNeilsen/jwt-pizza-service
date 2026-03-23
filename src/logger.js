@@ -24,6 +24,10 @@ class Logger {
         next();
     };
 
+    dbLogger(query) {
+        this.log('info', 'db', query);
+    }
+
     factoryLogger(orderInfo) {
         this.log('info', 'factory', orderInfo);
     }
