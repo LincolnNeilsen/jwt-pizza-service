@@ -17,7 +17,7 @@ class Logger {
                 resBody: JSON.stringify(resBody),
             };
             const level = this.statusToLogLevel(res.statusCode);
-            this.log(level, 'http', this.sanitize(logData));
+            this.log(level, 'http', logData);
             res.send = send;
             return res.send(resBody);
         };
@@ -29,7 +29,7 @@ class Logger {
     }
 
     factoryLogger(orderInfo) {
-        this.log('info', 'factory', this.sanitize(orderInfo));
+        this.log('info', 'factory', orderInfo);
     }
 
     unhandledErrorLogger(err) {
