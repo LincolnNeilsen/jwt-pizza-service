@@ -17,7 +17,7 @@ class Logger {
                 resBody: JSON.stringify(resBody),
             };
             const level = this.statusToLogLevel(res.statusCode);
-            this.log(level, 'http', logData);
+            this.log(level, 'http', this.sanitize(logData));
             res.send = send;
             return res.send(resBody);
         };
