@@ -29,7 +29,7 @@ class Logger {
     }
 
     factoryLogger(orderInfo) {
-        this.log('info', 'factory', orderInfo);
+        this.log('info', 'factory', this.sanitize(orderInfo));
     }
 
     unhandledErrorLogger(err) {
@@ -60,6 +60,7 @@ class Logger {
         logData = JSON.stringify(logData);
         logData = logData.replace(/\\"password\\":\s*\\"[^"]*\\"/g, '\\"password\\": \\"*****\\"');
         logData = logData.replace(/\\password\\=\s*\\"[^"]*\\"/g, '\\"password\\": \\"*****\\"');
+        logData = logData.replace(/\\"jwt\\":\s*\\"[^"]*\\"/g, '\\"jwt\\":\\"*****\\"');
         return logData;
     }
 
