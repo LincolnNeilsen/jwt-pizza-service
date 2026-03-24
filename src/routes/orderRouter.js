@@ -95,11 +95,11 @@ orderRouter.post(
             const price = orderReq.items?.reduce((acc, item) => acc + item.price, 0) || 0;
             const count = orderReq.items?.length || 0;
             metrics.pizzaPurchase(true, latency, price, count);
-            logger.factoryLogger({reqBody: req.body, resBody: j.body, statusCode: r.status});
+            logger.factoryLogger({reqBody: JSON.stringify(req.body), resBody: JSON.stringify(j), statusCode: r.status});
             res.send({order, followLinkToEndChaos: j.reportUrl, jwt: j.jwt});
         } else {
             metrics.pizzaPurchase(false, latency);
-            logger.factoryLogger({reqBody: req.body, resBody: j.body, statusCode: r.status});
+            logger.factoryLogger({reqBody: JSON.stringify(req.body), resBody: JSON.stringify(j), statusCode: r.status});
             res.status(500).send({message: 'Failed to fulfill order at factory', followLinkToEndChaos: j.reportUrl});
         }
     })
