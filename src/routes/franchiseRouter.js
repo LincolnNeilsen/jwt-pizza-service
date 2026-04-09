@@ -132,7 +132,7 @@ franchiseRouter.delete(
   '/:franchiseId/store/:storeId',
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
-    if (!req.user.isRole(Role.Admin)) {
+    if (!franchise || (!req.user.isRole(Role.Admin) && !franchise.admins.some((admin) => admin.id === req.user.id))) {
         throw new StatusCodeError('unable to delete a store', 403);
     }
     const franchiseId = Number(req.params.franchiseId);
