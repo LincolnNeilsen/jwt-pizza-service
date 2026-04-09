@@ -9,6 +9,7 @@ franchiseRouter.docs = [
   {
     method: 'GET',
     path: '/api/franchise?page=0&limit=10&name=*',
+    requiresAuth: true,
     description: 'List all the franchises',
     example: `curl localhost:3000/api/franchise&page=0&limit=10&name=pizzaPocket`,
     response: { franchises: [{ id: 1, name: 'pizzaPocket', admins: [{ id: 4, name: 'pizza franchisee', email: 'f@jwt.com' }], stores: [{ id: 1, name: 'SLC', totalRevenue: 0 }] }], more: true },
@@ -58,7 +59,11 @@ franchiseRouter.docs = [
 // getFranchises
 franchiseRouter.get(
   '/',
+  authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
+    if (!req.user.isRole(Role.Admin)) {
+      throw new StatusCodeError('unable to list franchises', 403);
+    }
     const [franchises, more] = await DB.getFranchises(req.user, req.query.page, req.query.limit, req.query.name);
     res.json({ franchises, more });
   })
@@ -96,7 +101,11 @@ franchiseRouter.post(
 // deleteFranchise
 franchiseRouter.delete(
   '/:franchiseId',
+  authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
+    if (!req.user.isRole(Role.Admin)) {
+        throw new StatusCodeError('unable to delete a franchise', 403);
+    }
     const franchiseId = Number(req.params.franchiseId);
     await DB.deleteFranchise(franchiseId);
     res.json({ message: 'franchise deleted' });
@@ -123,6 +132,9 @@ franchiseRouter.delete(
   '/:franchiseId/store/:storeId',
   authRouter.authenticateToken,
   asyncHandler(async (req, res) => {
+    if (!req.user.isRole(Role.Admin)) {
+        throw new StatusCodeError('unable to delete a store', 403);
+    }
     const franchiseId = Number(req.params.franchiseId);
     const franchise = await DB.getFranchise({ id: franchiseId });
     if (!franchise || (!req.user.isRole(Role.Admin) && !franchise.admins.some((admin) => admin.id === req.user.id))) {
