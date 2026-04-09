@@ -81,6 +81,13 @@ orderRouter.post(
     authRouter.authenticateToken,
     asyncHandler(async (req, res) => {
         const orderReq = req.body;
+        const menu = await DB.getMenu();
+        for (const item of orderReq.items) {
+            const menuItem = menu.find((m) => m.id === item.menuId);
+            if (!menuItem || menuItem.price !== item.price) {
+                throw new StatusCodeError('invalid pizza price', 400);
+            }
+        }
         const order = await DB.addDinerOrder(req.user, orderReq);
         const start = Date.now();
 
